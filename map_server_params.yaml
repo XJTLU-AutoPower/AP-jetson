@@ -1,0 +1,6 @@
+map_server:
+	ros__parameters:
+		frame_id:map
+		topic_name:map
+		use_sim_time:false
+		yaml_filename:/home/nx/F1tenth/f1_ws/algo/src/maps/levine_2nd.yaml
