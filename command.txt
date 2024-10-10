@@ -1,0 +1,24 @@
+launch and run list (ordered)
+launch: pure_pursuit/pure_pursuit_node lane_follow/lane_follow urg_node2/urg_node2_launch
+run: tf2_ros*4 communication/com nav2_amcl/amcl nav2_map_server/map_server pose_transformer/pose_transformer ros2_laser_scan_matcher/ros2_laser_scan_matcher
+another terminal: lifecycle and cansend control
+
+
+
+command record:
+ros2 run cartographer_ros cartographer_node --configuration_directory /home/nx/F1tenth/slam_ws/autopowerslam/src/autopowerslam/config --configuration_basename AutoPower_2d.lua
+ros2 run cartographer_ros occupancy_grid_node -resolution 0.5 -publish_period_sec 1.0
+ros2 launch urg_node2 urg_node2.launch.py
+
+sudo ip link set can0 up type can bitrate 1000000
+cansend can0 112#DEADBEEF
+candump can01
+ros2 launch particle_filter amcl.launch.py use_sim_time:=false map:=autopower.yaml
+ros2 lifecycle set /amcl configure
+ros2 lifecycle set /amcl activate
+ros2 run nav2_map_server map_server --ros-args --param yaml_filename:=autopower.yaml
+ros2 run tf2_ros static_transform_publisher 0 0 0 0 0 1 laser -
+ros2 run tf2_ros static_transform_publisher 0 0 0 0 0 1 - base_link
+ros2 run tf2_ros static_transform_publisher 0 0 0 0 0 0 odom laser
+ros2 run tf2_ros static_transform_publisher 0 0 0 0 0 1 laser base_footprint
+

@@ -1,0 +1,107 @@
+import rclpy
+from rclpy.node import Node
+from sensor_msgs.msg import LaserScan
+import can
+import math
+
+class DriveToCanNode(Node):
+    def __init__(self):
+        super().__init__('drive_to_can')
+        self.subscription = self.create_subscription(
+            LaserScan,
+            '/scan',
+            self.callback,
+            25
+        )
+
+
+    def callback(self, msg):
+        speed=1499
+        orienta=1499
+        angle_start = msg.angle_min
+        angle_end = msg.angle_max
+        angle_step = msg.angle_increment
+        range_min = msg.range_min
+        range_max = msg.range_max
+        ranges = msg.ranges
+        east_index = int(abs(math.pi/6 + angle_start) / angle_step)
+        west_index = int(abs(angle_start - math.pi/6) / angle_step)
+        eastnorth_index = int(abs(math.pi/4 + angle_start) / angle_step)
+        westnorth_index = int(abs(math.pi/4 - angle_start) / angle_step)
+        north_index = int(abs(angle_start / angle_step))
+        dic = {'east':sum(ranges[east_index-10:east_index+10])/20,
+               'west':urg_node2_nodesum(ranges[west_index-10:west_index+10])/20,
+               'eastnorth':ranges[eastnorth_index],
+               'north':ranges[north_index],
+               'westnorth':ranges[westnorth_index]}
+        if dic['north'] > 0.8:
+            #speed = 2000
+            #oriental = 1320
+            if dic['eastnorth'] < 2.6:
+                speed = 1900
+                oriental = 1499 -500
+            elif dic['westnorth'] < 2.6:
+                speed = 1900
+                oriental = 1499 + 500
+            elif dic['east'] < 2.2:
+                speed = 1900
+                oriental = 1499 - 200
+            elif dic['west'] < 2.2:
+                speed = 1900
+                oriental = 1499 + 200
+            elif dic['west'] - dic['east'] > 0.6:
+                speed = 1900
+                oriental = 1499 - 100
+            elif dic['east'] - dic['west'] > 0.6:
+                speed = 1900
+                oriental = 1499 + 100
+        elif dic['north'] <= 0.8 and dic['north'] > 0.2:
+            speed = 1800
+            oriental = 1499 - 500
+        else:
+            speed = 1499
+            oriental = 1499
+
+
+        a, b = self.transfer(speed)
+        c, d = self.transfer(oriental)
+
+
+        # Candlelight firmware on Linux
+        bus = can.interface.Bus(interface='socketcan', channel='can0', bitrate=1000000)
+
+	# Stock slcan firmware on Linux
+		# bus = can.interface.Bus(interface='slcan', channel='/dev/ttyACM0', bitrate=1000000)
+        try:
+                msg = can.Message(arbitration_id=0x112, data=[c, d, a, b, 0, 0, 0, 0],
+		                  is_extended_id=False)
+        except can.CanError:
+                self.get_logger().info("Message NOT sent")
+
+        try:
+            bus.send(msg)
+            print("Message sent on {}".format(bus.channel_info))
+        except can.CanError:
+            print("Message NOT sent")
+
+
+    def transfer(self, value):
+        b = hex(value)
+        end_part = b[len(b) - 2:len(b)]
+        front_part = b[:len(b) - 2]
+        front_part = front_part.replace('0x', '')
+        end_part = int(end_part, 16)
+        front_part = int(front_part, 16)
+
+        return front_part, end_part
+
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = DriveToCanNode()
+    rclpy.spin(node)
+    node.destroy_node()
+    rclpy.shutdown()
+
+if __name__ == '__main__':
+    main()
